@@ -36,7 +36,7 @@
       font-weight: bold;
       color: #333;
     }
-    button {
+    button, select {
       margin-top: 15px;
       padding: 10px 20px;
       font-size: 16px;
@@ -46,14 +46,20 @@
       border-radius: 6px;
       cursor: pointer;
     }
-    button:hover {
+    button:hover, select:hover {
       background-color: #0056b3;
+    }
+    #zoom-control {
+      margin-top: 10px;
+      width: 200px;
     }
   </style>
 </head>
 <body>
   <h2>Scan Barcode</h2>
   <div id="reader"></div>
+
+  <input type="range" id="zoom-control" min="1" max="5" step="0.1" value="1">
 
   <div id="result-box">
     <p>📦 Hasil Scan:</p>
@@ -66,31 +72,49 @@
   <script>
     let scannedCode = "";
     const beepSound = document.getElementById("beep-sound");
+    const zoomControl = document.getElementById("zoom-control");
     const html5QrCode = new Html5Qrcode("reader");
+    let currentCameraId = null;
+    let cameraCapabilities = null;
 
-    html5QrCode.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.UPC_A
-        ]
-      },
-      (decodedText, decodedResult) => {
-        if (!scannedCode) {
-          scannedCode = decodedText;
-          beepSound.play();
-          document.getElementById("result-text").textContent = decodedText;
-          document.getElementById("result-box").style.display = "block";
-        }
-      },
-      (errorMessage) => {}
-    ).catch(err => {
-      alert("Gagal membuka kamera: " + err);
+    Html5Qrcode.getCameras().then(cameras => {
+      if (cameras && cameras.length) {
+        currentCameraId = cameras[0].id;
+        html5QrCode.start(
+          { deviceId: { exact: currentCameraId } },
+          {
+            fps: 15,
+            qrbox: { width: 300, height: 300 },
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.QR_CODE,
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.UPC_A
+            ]
+          },
+          (decodedText, decodedResult) => {
+            if (!scannedCode) {
+              scannedCode = decodedText;
+              beepSound.play();
+              document.getElementById("result-text").textContent = decodedText;
+              document.getElementById("result-box").style.display = "block";
+              html5QrCode.pause();
+            }
+          },
+          (errorMessage) => {}
+        ).then(() => {
+          html5QrCode.getRunningTrackSettings().then(settings => {
+            cameraCapabilities = settings;
+          });
+        });
+      }
+    });
+
+    zoomControl.addEventListener("input", () => {
+      const zoomValue = parseFloat(zoomControl.value);
+      if (cameraCapabilities && cameraCapabilities.zoom) {
+        html5QrCode.applyVideoConstraints({ advanced: [{ zoom: zoomValue }] });
+      }
     });
 
     document.getElementById("ok-btn").addEventListener("click", () => {
