@@ -60,11 +60,14 @@
   <div id="reader"></div>
 
   <input type="range" id="zoom-control" min="1" max="5" step="0.1" value="1">
+  <br>
+  <small style="color: #777;">* Zoom hanya berfungsi jika kamera mendukung</small>
 
   <div id="result-box">
     <p>📦 Hasil Scan:</p>
     <p id="result-text">-</p>
     <button id="ok-btn">OK ➜ Lanjutkan</button>
+    <button onclick="restartScan()">🔄 Scan Lagi</button>
   </div>
 
   <audio id="beep-sound" src="https://freesound.org/data/previews/522/522327_11567197-lq.mp3" preload="auto"></audio>
@@ -79,7 +82,9 @@
 
     Html5Qrcode.getCameras().then(cameras => {
       if (cameras && cameras.length) {
-        currentCameraId = cameras[0].id;
+        // Prioritaskan kamera belakang
+        currentCameraId = cameras.find(cam => cam.label.toLowerCase().includes('back'))?.id || cameras[0].id;
+
         html5QrCode.start(
           { deviceId: { exact: currentCameraId } },
           {
@@ -107,12 +112,14 @@
             cameraCapabilities = settings;
           });
         });
+      } else {
+        alert("Tidak ada kamera terdeteksi. Pastikan perangkat memiliki akses kamera.");
       }
     });
 
     zoomControl.addEventListener("input", () => {
       const zoomValue = parseFloat(zoomControl.value);
-      if (cameraCapabilities && cameraCapabilities.zoom) {
+      if (cameraCapabilities && "zoom" in cameraCapabilities) {
         html5QrCode.applyVideoConstraints({ advanced: [{ zoom: zoomValue }] });
       }
     });
@@ -125,6 +132,12 @@
         });
       }
     });
+
+    function restartScan() {
+      scannedCode = "";
+      document.getElementById("result-box").style.display = "none";
+      html5QrCode.resume();
+    }
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
